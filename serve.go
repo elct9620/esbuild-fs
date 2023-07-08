@@ -18,12 +18,12 @@ func Serve(buildOptions api.BuildOptions, options ...PluginOptionFn) (http.Handl
 	fsys := New()
 	sse := NewSSE()
 
-	pluginOptions := PluginOptions{Outdir: buildOptions.Outdir, ServerSentEvent: sse}
+	pluginOptions := PluginOptions{Outdir: buildOptions.Outdir, ServerSentEvent: sse, FileSystem: fsys}
 	for _, fn := range options {
 		fn(&pluginOptions)
 	}
 
-	plugin, err := Plugin(fsys, pluginOptions)
+	plugin, err := Plugin(pluginOptions)
 	if err != nil {
 		return nil, nil, err
 	}
