@@ -13,13 +13,13 @@ var _ FSEvent = &FS{}
 
 type FS struct {
 	mux              sync.RWMutex
-	files            map[string]file
+	files            map[string]*file
 	onChangedHandler []EventHandler
 }
 
 func New() *FS {
 	return &FS{
-		files:            make(map[string]file),
+		files:            make(map[string]*file),
 		onChangedHandler: make([]EventHandler, 0),
 	}
 }
@@ -29,8 +29,7 @@ func (fsys *FS) Open(name string) (fs.File, error) {
 	defer fsys.mux.RUnlock()
 
 	if file, ok := fsys.files[name]; ok {
-		opened := file.Clone()
-		return &opened, nil
+		return file.Clone(), nil
 	}
 
 	return nil, fs.ErrNotExist
@@ -45,7 +44,7 @@ func (fsys *FS) Write(name string, content io.Reader) error {
 		return err
 	}
 
-	fsys.files[name] = file{
+	fsys.files[name] = &file{
 		name:         name,
 		contents:     bytes.NewBuffer(buffer),
 		size:         int64(len(buffer)),
