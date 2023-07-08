@@ -1,9 +1,9 @@
 package esbuildfs
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"net/http"
 	"sync"
 	"time"
@@ -11,26 +11,25 @@ import (
 
 var ErrFlasherUnsupported = errors.New("the flusher is not supported")
 
-type EventHandler func(fs.File)
-type FSEvent interface {
-	OnChanged(EventHandler)
-}
-
 type serverSentEvent struct {
 	event string
 	data  string
 }
 
-type ServerSentEvent struct {
+type changeEvent struct {
+	Update []string `json:"updated"`
+}
+
+type ServerSentEventHandler struct {
 	mux     sync.RWMutex
 	streams []chan serverSentEvent
 }
 
-func NewSSE() *ServerSentEvent {
-	return &ServerSentEvent{}
+func NewSSE() *ServerSentEventHandler {
+	return &ServerSentEventHandler{}
 }
 
-func (s *ServerSentEvent) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (s *ServerSentEventHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	err := convertToSSE(w)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -51,24 +50,23 @@ func (s *ServerSentEvent) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	s.RemoveStream(stream)
 }
 
-func (s *ServerSentEvent) Watch(publisher FSEvent) {
-	publisher.OnChanged(func(file fs.File) {
-		info, err := file.Stat()
-		if err != nil {
-			return
-		}
-
-		s.Broadcast("change", fmt.Sprintf(`{"updated":["%s"]}`, info.Name()))
-	})
-}
-
-func (s *ServerSentEvent) Broadcast(event, data string) {
+func (s *ServerSentEventHandler) Broadcast(event, data string) {
 	for idx := range s.streams {
 		s.streams[idx] <- serverSentEvent{event, data}
 	}
 }
 
-func (s *ServerSentEvent) NewStream() chan serverSentEvent {
+func (s *ServerSentEventHandler) NotifyChanged(updated []string) error {
+	data, err := json.Marshal(changeEvent{updated})
+	if err != nil {
+		return err
+	}
+
+	s.Broadcast("change", string(data))
+	return nil
+}
+
+func (s *ServerSentEventHandler) NewStream() chan serverSentEvent {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
@@ -78,7 +76,7 @@ func (s *ServerSentEvent) NewStream() chan serverSentEvent {
 	return stream
 }
 
-func (s *ServerSentEvent) RemoveStream(stream chan serverSentEvent) {
+func (s *ServerSentEventHandler) RemoveStream(stream chan serverSentEvent) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 

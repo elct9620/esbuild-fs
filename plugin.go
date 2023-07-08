@@ -9,8 +9,9 @@ import (
 )
 
 type PluginOptions struct {
-	Outdir string
-	Prefix string
+	Outdir          string
+	Prefix          string
+	ServerSentEvent *ServerSentEventHandler
 }
 
 func Plugin(fsys *FS, options PluginOptions) (api.Plugin, error) {
@@ -25,11 +26,18 @@ func Plugin(fsys *FS, options PluginOptions) (api.Plugin, error) {
 		Name: "esbuild-fs",
 		Setup: func(build api.PluginBuild) {
 			build.OnEnd(func(result *api.BuildResult) (api.OnEndResult, error) {
+				changes := make([]string, 0)
 				for _, file := range result.OutputFiles {
-					err := writeFile(fsys, basePath, options.Prefix, file)
+					path, err := writeFile(fsys, basePath, options.Prefix, file)
 					if err != nil {
 						return api.OnEndResult{}, err
 					}
+
+					changes = append(changes, path)
+				}
+
+				if options.ServerSentEvent != nil {
+					options.ServerSentEvent.NotifyChanged(changes)
 				}
 
 				return api.OnEndResult{}, nil
@@ -38,13 +46,13 @@ func Plugin(fsys *FS, options PluginOptions) (api.Plugin, error) {
 	}, nil
 }
 
-func writeFile(fsys *FS, basePath, prefix string, file api.OutputFile) error {
+func writeFile(fsys *FS, basePath, prefix string, file api.OutputFile) (string, error) {
 	path, err := getRelPath(basePath, prefix, file.Path)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return fsys.Write(path, bytes.NewReader(file.Contents))
+	return path, fsys.Write(path, bytes.NewReader(file.Contents))
 }
 
 func getRelPath(basePath, prefix, path string) (string, error) {

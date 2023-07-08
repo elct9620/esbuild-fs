@@ -17,9 +17,8 @@ func WithHandlerPrefix(prefix string) PluginOptionFn {
 func Serve(buildOptions api.BuildOptions, options ...PluginOptionFn) (http.Handler, http.Handler, error) {
 	fsys := New()
 	sse := NewSSE()
-	sse.Watch(fsys)
 
-	pluginOptions := PluginOptions{Outdir: buildOptions.Outdir}
+	pluginOptions := PluginOptions{Outdir: buildOptions.Outdir, ServerSentEvent: sse}
 	for _, fn := range options {
 		fn(&pluginOptions)
 	}

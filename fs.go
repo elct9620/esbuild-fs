@@ -9,18 +9,15 @@ import (
 )
 
 var _ fs.FS = &FS{}
-var _ FSEvent = &FS{}
 
 type FS struct {
-	mux              sync.RWMutex
-	files            map[string]*file
-	onChangedHandler []EventHandler
+	mux   sync.RWMutex
+	files map[string]*file
 }
 
 func New() *FS {
 	return &FS{
-		files:            make(map[string]*file),
-		onChangedHandler: make([]EventHandler, 0),
+		files: make(map[string]*file),
 	}
 }
 
@@ -50,17 +47,6 @@ func (fsys *FS) Write(name string, content io.Reader) error {
 		size:         int64(len(buffer)),
 		modifiedTime: time.Now(),
 	}
-	emitOnChanged(fsys, fsys.files[name])
 
 	return nil
-}
-
-func (fsys *FS) OnChanged(handler EventHandler) {
-	fsys.onChangedHandler = append(fsys.onChangedHandler, handler)
-}
-
-func emitOnChanged(fsys *FS, file fs.File) {
-	for idx := range fsys.onChangedHandler {
-		fsys.onChangedHandler[idx](file)
-	}
 }

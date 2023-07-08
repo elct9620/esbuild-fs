@@ -2,7 +2,6 @@ package esbuildfs_test
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -16,8 +15,8 @@ import (
 func Test_SSE(t *testing.T) {
 	t.Parallel()
 
-	fsys := esbuildfs.New()
-	server := newServer(fsys)
+	sse := esbuildfs.NewSSE()
+	server := httptest.NewServer(sse)
 	defer server.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
@@ -26,9 +25,9 @@ func Test_SSE(t *testing.T) {
 	res := connectSSE(t, ctx, server.URL)
 	events := readEvents(bufio.NewReader(res.Body))
 
-	err := fsys.Write("app.js", bytes.NewBufferString(""))
+	err := sse.NotifyChanged([]string{"app.js"})
 	if err != nil {
-		t.Fatal("unable to write file", err)
+		t.Fatal("unable to notify changes", err)
 	}
 
 	expected := `{"updated":["app.js"]}`
@@ -42,13 +41,6 @@ func Test_SSE(t *testing.T) {
 			}
 		}
 	}
-}
-
-func newServer(fsys *esbuildfs.FS) *httptest.Server {
-	sse := esbuildfs.NewSSE()
-	sse.Watch(fsys)
-
-	return httptest.NewServer(sse)
 }
 
 func connectSSE(t *testing.T, ctx context.Context, url string) *http.Response {
