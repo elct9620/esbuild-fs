@@ -27,7 +27,10 @@ func Test_SSE(t *testing.T) {
 
 	go sse.ServeHTTP(w, req)
 	time.Sleep(1 * time.Millisecond)
-	fsys.Write("app.js", bytes.NewBufferString(""))
+	err := fsys.Write("app.js", bytes.NewBufferString(""))
+	if err != nil {
+		t.Fatal("unable wirte file", err)
+	}
 	<-req.Context().Done()
 
 	rawBody, err := io.ReadAll(w.Body)
