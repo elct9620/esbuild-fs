@@ -11,8 +11,8 @@ import (
 func Test_Plugin(t *testing.T) {
 	fsys := esbuildfs.New()
 	plugin := givenAnNewPlugin(t, fsys)
-
-	whenBuildStdin(t, plugin, "console.log(true)")
+	options := givenAStdinBuild(t, []api.Plugin{plugin}, "console.log(true)")
+	whenBuild(t, options)
 	thenCanOpenFile(t, fsys, "stdin.js")
 }
 
@@ -27,17 +27,23 @@ func givenAnNewPlugin(t *testing.T, writer esbuildfs.Writer, options ...esbuildf
 	return plugin
 }
 
-func whenBuildStdin(t *testing.T, plugin api.Plugin, content string) {
+func givenAStdinBuild(t *testing.T, plugins []api.Plugin, content string) api.BuildOptions {
 	t.Helper()
 
-	res := api.Build(api.BuildOptions{
+	return api.BuildOptions{
 		Stdin: &api.StdinOptions{
 			Contents: content,
 		},
-		Outdir:  "dist",
-		Plugins: []api.Plugin{plugin},
-	})
+		Outdir:   "dist",
+		Plugins:  plugins,
+		LogLevel: api.LogLevelDebug,
+	}
+}
 
+func whenBuild(t *testing.T, options api.BuildOptions) {
+	t.Helper()
+
+	res := api.Build(options)
 	if len(res.Errors) > 0 {
 		t.Fatal("unable to build assets", res.Errors)
 	}
