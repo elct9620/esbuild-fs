@@ -1,12 +1,15 @@
 package esbuildfs
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
 	"sync"
 	"time"
 )
+
+var ErrFlasherUnsupported = errors.New("the flusher is not supported")
 
 type EventHandler func(fs.File)
 type FSEvent interface {
@@ -121,6 +124,11 @@ func serveStream(stream chan serverSentEvent, closed chan bool, w http.ResponseW
 }
 
 func convertToSSE(w http.ResponseWriter) (err error) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		return ErrFlasherUnsupported
+	}
+
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -128,5 +136,10 @@ func convertToSSE(w http.ResponseWriter) (err error) {
 
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write([]byte("retry: 500\n"))
-	return err
+	if err != nil {
+		return err
+	}
+
+	flusher.Flush()
+	return nil
 }
