@@ -29,7 +29,8 @@ func (fsys *FS) Open(name string) (fs.File, error) {
 	defer fsys.mux.RUnlock()
 
 	if file, ok := fsys.files[name]; ok {
-		return &file, nil
+		opened := file.Clone()
+		return &opened, nil
 	}
 
 	return nil, fs.ErrNotExist
@@ -46,7 +47,8 @@ func (fsys *FS) Write(name string, content io.Reader) error {
 
 	fsys.files[name] = file{
 		name:         name,
-		contents:     bytes.NewReader(buffer),
+		contents:     bytes.NewBuffer(buffer),
+		size:         int64(len(buffer)),
 		modifiedTime: time.Now(),
 	}
 	emitOnChanged(fsys, fsys.files[name])

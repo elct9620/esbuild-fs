@@ -11,19 +11,34 @@ var _ fs.FileInfo = &file{}
 
 type file struct {
 	name         string
-	contents     *bytes.Reader
+	contents     *bytes.Buffer
+	size         int64
 	modifiedTime time.Time
+	closed       bool
 }
 
 func (f file) Stat() (fs.FileInfo, error) {
+	if f.closed {
+		return nil, fs.ErrClosed
+	}
+
 	return &f, nil
 }
 
 func (f file) Read(buffer []byte) (int, error) {
+	if f.closed {
+		return 0, fs.ErrClosed
+	}
+
 	return f.contents.Read(buffer)
 }
 
 func (f file) Close() error {
+	if f.closed {
+		return fs.ErrClosed
+	}
+
+	f.closed = true
 	return nil
 }
 
@@ -32,7 +47,7 @@ func (f file) Name() string {
 }
 
 func (f file) Size() int64 {
-	return int64(f.contents.Size())
+	return f.size
 }
 
 func (f file) Mode() fs.FileMode {
@@ -49,4 +64,13 @@ func (f file) IsDir() bool {
 
 func (f file) Sys() any {
 	return nil
+}
+
+func (f file) Clone() file {
+	return file{
+		name:         f.name,
+		contents:     bytes.NewBuffer(f.contents.Bytes()),
+		size:         f.size,
+		modifiedTime: f.modifiedTime,
+	}
 }
