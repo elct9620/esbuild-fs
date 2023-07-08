@@ -6,24 +6,11 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 )
 
-type PluginOptionFn func(options *PluginOptions)
-
-func WithHandlerPrefix(prefix string) PluginOptionFn {
-	return func(options *PluginOptions) {
-		options.Prefix = prefix
-	}
-}
-
 func Serve(buildOptions api.BuildOptions, options ...PluginOptionFn) (http.Handler, http.Handler, error) {
 	fsys := New()
 	sse := NewSSE()
-
-	pluginOptions := PluginOptions{Outdir: buildOptions.Outdir, ServerSentEvent: sse, FileSystem: fsys}
-	for _, fn := range options {
-		fn(&pluginOptions)
-	}
-
-	plugin, err := Plugin(pluginOptions)
+	options = append(options, WithNotifier(sse))
+	plugin, err := Plugin(buildOptions.Outdir, fsys, options...)
 	if err != nil {
 		return nil, nil, err
 	}

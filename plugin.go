@@ -9,12 +9,7 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 )
 
-type PluginOptions struct {
-	Outdir          string
-	Prefix          string
-	FileSystem      *FS
-	ServerSentEvent *ServerSentEventHandler
-}
+type PluginOptionFn = func(*fsPlugin)
 
 type Writer interface {
 	Write(name string, content io.Reader) error
@@ -31,18 +26,22 @@ type fsPlugin struct {
 	notifier Notifier
 }
 
-func newPlugin(options PluginOptions) (*fsPlugin, error) {
+func newPlugin(outdir string, writer Writer, options ...PluginOptionFn) (*fsPlugin, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
 
-	return &fsPlugin{
-		basePath: filepath.Join(cwd, options.Outdir),
-		prefix:   options.Prefix,
-		writer:   options.FileSystem,
-		notifier: options.ServerSentEvent,
-	}, nil
+	plugin := &fsPlugin{
+		basePath: filepath.Join(cwd, outdir),
+		writer:   writer,
+	}
+
+	for _, fn := range options {
+		fn(plugin)
+	}
+
+	return plugin, nil
 }
 
 func (p *fsPlugin) Update(files []api.OutputFile) error {
@@ -55,6 +54,10 @@ func (p *fsPlugin) Update(files []api.OutputFile) error {
 		}
 
 		changes = append(changes, path)
+	}
+
+	if p.notifier == nil {
+		return nil
 	}
 
 	return p.notifier.NotifyChanged(changes)
@@ -78,8 +81,20 @@ func (p *fsPlugin) RelPath(path string) (string, error) {
 	return filepath.Join(p.prefix, relPath), nil
 }
 
-func Plugin(options PluginOptions) (api.Plugin, error) {
-	plugin, err := newPlugin(options)
+func WithPrefix(prefix string) PluginOptionFn {
+	return func(plugin *fsPlugin) {
+		plugin.prefix = prefix
+	}
+}
+
+func WithNotifier(notifier Notifier) PluginOptionFn {
+	return func(plugin *fsPlugin) {
+		plugin.notifier = notifier
+	}
+}
+
+func Plugin(outdir string, writer Writer, options ...PluginOptionFn) (api.Plugin, error) {
+	plugin, err := newPlugin(outdir, writer, options...)
 	if err != nil {
 		return api.Plugin{}, err
 	}
