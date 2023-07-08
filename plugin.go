@@ -37,7 +37,10 @@ func Plugin(fsys *FS, options PluginOptions) (api.Plugin, error) {
 				}
 
 				if options.ServerSentEvent != nil {
-					options.ServerSentEvent.NotifyChanged(changes)
+					err := options.ServerSentEvent.NotifyChanged(changes)
+					if err != nil {
+						return api.OnEndResult{}, err
+					}
 				}
 
 				return api.OnEndResult{}, nil
