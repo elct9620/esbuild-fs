@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/evanw/esbuild/pkg/api"
 )
@@ -33,7 +35,7 @@ func newPlugin(outdir string, writer Writer, options ...PluginOptionFn) (*fsPlug
 	}
 
 	plugin := &fsPlugin{
-		basePath: filepath.Join(cwd, outdir),
+		basePath: strings.ReplaceAll(path.Join(cwd, outdir), "\\", "/"),
 		writer:   writer,
 	}
 
@@ -72,13 +74,13 @@ func (p *fsPlugin) Write(file api.OutputFile) (string, error) {
 	return path, p.writer.Write(path, bytes.NewBuffer(file.Contents))
 }
 
-func (p *fsPlugin) RelPath(path string) (string, error) {
-	relPath, err := filepath.Rel(p.basePath, path)
+func (p *fsPlugin) RelPath(name string) (string, error) {
+	relPath, err := filepath.Rel(p.basePath, strings.ReplaceAll(name, "\\", "/"))
 	if err != nil {
-		return path, err
+		return name, err
 	}
 
-	return filepath.Join(p.prefix, relPath), nil
+	return path.Join(p.prefix, relPath), nil
 }
 
 func WithPrefix(prefix string) PluginOptionFn {
