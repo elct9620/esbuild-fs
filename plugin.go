@@ -35,7 +35,7 @@ func newPlugin(outdir string, writer Writer, options ...PluginOptionFn) (*fsPlug
 	}
 
 	plugin := &fsPlugin{
-		basePath: strings.ReplaceAll(path.Join(cwd, outdir), "\\", "/"),
+		basePath: formatPath(path.Join(cwd, outdir)),
 		writer:   writer,
 	}
 
@@ -75,7 +75,7 @@ func (p *fsPlugin) Write(file api.OutputFile) (string, error) {
 }
 
 func (p *fsPlugin) RelPath(name string) (string, error) {
-	relPath, err := filepath.Rel(p.basePath, strings.ReplaceAll(name, "\\", "/"))
+	relPath, err := filepath.Rel(p.basePath, formatPath(name))
 	if err != nil {
 		return name, err
 	}
@@ -114,4 +114,8 @@ func Plugin(outdir string, writer Writer, options ...PluginOptionFn) (api.Plugin
 			})
 		},
 	}, nil
+}
+
+func formatPath(path string) string {
+	return strings.ReplaceAll(path, "\\", "/")
 }
