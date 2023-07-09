@@ -22,7 +22,7 @@ assets, sse, err := esbuildfs.Server(
         Outdir: "static/js", // required
         // ...
     },
-    esbuildfs.WithHandlerPrefix("assets"),
+    esbuildfs.WithPrefix("assets"), // Or `http.StripPrefix`
 )
 
 // ...

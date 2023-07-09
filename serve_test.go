@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"net/http"
-	"path/filepath"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -16,16 +16,38 @@ func Test_Serve_Assets(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		Name   string
-		Prefix string
+		Name         string
+		MountTo      string
+		Prefix       string
+		Wrapper      func(http.Handler) http.Handler
+		ExpectedPath string
 	}{
 		{
-			Name:   "server on root",
-			Prefix: "",
+			Name:    "server on root",
+			MountTo: "/",
+			Prefix:  "",
+			Wrapper: func(handler http.Handler) http.Handler {
+				return handler
+			},
+			ExpectedPath: "stdin.js",
 		},
 		{
-			Name:   "with prefix",
-			Prefix: "assets",
+			Name:    "with prefix",
+			MountTo: "/",
+			Prefix:  "assets",
+			Wrapper: func(handler http.Handler) http.Handler {
+				return handler
+			},
+			ExpectedPath: "assets/stdin.js",
+		},
+		{
+			Name:    "with prefix use http.StripPrefix",
+			MountTo: "/assets/",
+			Prefix:  "",
+			Wrapper: func(handler http.Handler) http.Handler {
+				return http.StripPrefix("/assets", handler)
+			},
+			ExpectedPath: "assets/stdin.js",
 		},
 	}
 
@@ -37,16 +59,16 @@ func Test_Serve_Assets(t *testing.T) {
 
 			options := givenAStdinBuild(t, []api.Plugin{}, "console.log(true)")
 			assets, _ := givenAServeHandlers(t, options, esbuildfs.WithPrefix(tc.Prefix))
-			serverURL := givenAServer(t, assets)
+			serverURL := givenAServerMountTo(t, tc.MountTo, tc.Wrapper(assets))
 			ctx := givenAContextWithTimeout(t, 1*time.Second)
 
 			for {
 				select {
 				case <-ctx.Done():
-					t.Fatal("unable to find assets")
+					t.Fatal("unable to find assets", tc.ExpectedPath)
 					return
 				default:
-					res := whenGetAssets(t, serverURL, filepath.Join(tc.Prefix, "stdin.js"))
+					res := whenGetAssets(t, serverURL, tc.ExpectedPath)
 					if thenMayFound(t, res) {
 						return
 					}
@@ -64,6 +86,20 @@ func Test_Serve_SSE(t *testing.T) {
 	res := whenConnectSSE(t, ctx, serverURL)
 	events := whenReceiveEvents(t, bufio.NewReader(res.Body))
 	thenCanSeeEvent(t, ctx, events, "retry")
+}
+
+func givenAServerMountTo(t *testing.T, path string, handler http.Handler) string {
+	t.Helper()
+
+	mux := http.NewServeMux()
+	mux.Handle(path, handler)
+
+	server := httptest.NewServer(mux)
+	t.Cleanup(func() {
+		server.Close()
+	})
+
+	return server.URL
 }
 
 func givenAServeHandlers(t *testing.T, buildOptions api.BuildOptions, options ...esbuildfs.PluginOptionFn) (http.Handler, http.Handler) {
