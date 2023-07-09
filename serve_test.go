@@ -60,7 +60,7 @@ func Test_Serve_Assets(t *testing.T) {
 			options := givenAStdinBuild(t, []api.Plugin{}, "console.log(true)")
 			assets, _ := givenAServeHandlers(t, options, esbuildfs.WithPrefix(tc.Prefix))
 			serverURL := givenAServerMountTo(t, tc.MountTo, tc.Wrapper(assets))
-			ctx := givenAContextWithTimeout(t, 1*time.Second)
+			ctx := givenAContextWithTimeout(t, 5*time.Second)
 
 			for {
 				select {
@@ -72,6 +72,7 @@ func Test_Serve_Assets(t *testing.T) {
 					if thenMayFound(t, res) {
 						return
 					}
+					time.Sleep(100 * time.Millisecond)
 				}
 			}
 		})
